@@ -5,7 +5,8 @@ import { Helmet } from 'react-helmet'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
 import { ballot } from './example-contracts'
 
-var extension = new window.RemixExtension()
+import {RemixExtension} from 'remix-plugin'
+const remixExtension = new RemixExtension()
 
 class App extends Component {
   constructor(props) {
@@ -41,26 +42,28 @@ class App extends Component {
     this.onPluginLoaded()
   }
 
-  onPluginLoaded() {
-    extension.call('app', 'updateTitle', ['remix-vyper'])
-    extension.call('editor', 'setFile', [`browser/${ballot.name}`, ballot.content])
+  async onPluginLoaded() {
+    console.log('IT IS LOADING')
+    await remixExtension.loaded() // Wait for remixExtension to get the handshake
+    console.log('IT IS LOADED') // Never log
+    remixExtension.call('editor', 'setFile', [`browser/${ballot.name}`, ballot.content])
   }
 
-  onCompileFromRemix() {
+  async onCompileFromRemix() {
     this.setState({ compilationResult: {status: "inProgress" }})
     const plugin = this
     plugin.result = {}
-    extension.call('editor', 'getCurrentFile', [], (error, result) => {
-      console.log(error, result)
-      plugin.result.placeholderText = result[0]
-      plugin.result.copied = false
-      extension.call('editor', 'getFile', result, (error, result) => {
-        console.log(result)
-        plugin.result.vyper = result[0]
-        plugin.setState(plugin.result)
-        plugin.compile(plugin.onCompileSucceeded, plugin.onCompileFailed, plugin.result)
-      })
-    })
+
+    const title = await remixExtension.call('fileManager', 'getCurrentFile')
+    console.log(title)
+    plugin.title.placeholderText = title[0]
+    plugin.title.copied = false
+
+    const file = await remixExtension.call('fileManager', 'getFile', title)
+    console.log(file)
+    plugin.result.vyper = file[0]
+    plugin.setState(plugin.result)
+    plugin.compile(plugin.onCompileSucceeded, plugin.onCompileFailed, plugin.result)
   }
 
   compile(onCompileSucceeded, onCompileFailed, result) {
@@ -113,7 +116,7 @@ class App extends Component {
   highlightErrors(fileName, line, color) {
     const lineColumnPos = {start: {line: line - 1}, end: {line: line - 1}}
     const obj = [JSON.stringify(lineColumnPos), fileName, color]
-    extension.call('editor', 'highlight', obj, (error, result) => {})
+    remixExtension.call('sourceHighlighters', 'highlight', obj)
   }
 
   onCompileFailed(compileResults, fileName) {
@@ -125,7 +128,7 @@ class App extends Component {
 
   onCompileSucceeded(compileResults) {
     this.setState({ compilationResult: compileResults })
-    extension.call('editor', 'discardHighlight', [], (error, result) => {})
+    remixExtension.call('sourceHighlighters', 'discardHighlight')
     var abi = compileResults['abi']
     var bytecode = compileResults['bytecode'].replace('0x','')
     var deployedBytecode = compileResults['bytecode_runtime'].replace('0x','')
@@ -159,7 +162,7 @@ class App extends Component {
         "methodIdentifiers": methodIdentifiers
       }
     }
-      extension.call('compiler', 'sendCompilationResult', [this.state.placeholderText, this.state.vyper, 'vyper', data])
+    remixExtension.emit('compilationFinished', [this.state.placeholderText, this.state.vyper, 'vyper', data])
   }
 
   createCompilationResultMessage(fileName, result) {
