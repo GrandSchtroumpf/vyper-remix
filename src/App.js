@@ -1,12 +1,12 @@
 import React, { Component } from 'react';
-import "./remix-api";
 import { Button, Radio, Popup, Icon, Menu, Segment, Message, Form, TextArea, Header, Image } from 'semantic-ui-react'
 import { Helmet } from 'react-helmet'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
 import { ballot } from './example-contracts'
 
-import {RemixExtension} from 'remix-plugin'
-const remixExtension = new RemixExtension()
+import { createIframeClient } from 'remix-plugin'
+const devMode = { port: 8000 }
+const remixExtension = createIframeClient({ devMode })
 
 class App extends Component {
   constructor(props) {
@@ -43,26 +43,28 @@ class App extends Component {
   }
 
   async onPluginLoaded() {
-    console.log('IT IS LOADING')
     await remixExtension.loaded() // Wait for remixExtension to get the handshake
-    console.log('IT IS LOADED') // Never log
-    remixExtension.call('editor', 'setFile', [`browser/${ballot.name}`, ballot.content])
+  }
+
+  async loadBallot () {
+    await remixExtension.call('fileManager', 'setFile', 'browser/ballot.vy', ballot)
   }
 
   async onCompileFromRemix() {
     this.setState({ compilationResult: {status: "inProgress" }})
     const plugin = this
-    plugin.result = {}
-
+     plugin.result = {}
+    remixExtension.emit('statusChanged', { key: 'spinner', type: 'info', title: 'compiling...' })
     const title = await remixExtension.call('fileManager', 'getCurrentFile')
     console.log(title)
-    plugin.title.placeholderText = title[0]
-    plugin.title.copied = false
+    this.state.placeholderText = title
+    this.state.copied = false
 
     const file = await remixExtension.call('fileManager', 'getFile', title)
     console.log(file)
-    plugin.result.vyper = file[0]
-    plugin.setState(plugin.result)
+
+
+    plugin.result.vyper = file
     plugin.compile(plugin.onCompileSucceeded, plugin.onCompileFailed, plugin.result)
   }
 
@@ -94,7 +96,7 @@ class App extends Component {
             console.log(response)
             onCompileSucceeded(response)
           } else {
-            onCompileFailed(response, result.placeholderText)
+            onCompileFailed(response, this.state.placeholderText)
           }
           break
 
@@ -114,12 +116,12 @@ class App extends Component {
   }
 
   highlightErrors(fileName, line, color) {
-    const lineColumnPos = {start: {line: line - 1}, end: {line: line - 1}}
-    const obj = [JSON.stringify(lineColumnPos), fileName, color]
-    remixExtension.call('sourceHighlighters', 'highlight', obj)
+    const lineColumnPos = { start: {line: line - 1}, end: {line: line - 1} }
+    remixExtension.call('editor', 'highlight', lineColumnPos, fileName, color)
   }
 
   onCompileFailed(compileResults, fileName) {
+    remixExtension.emit('statusChanged', { key: 'fail', type: 'error', title: 'compilation failed' })
     this.setState({ compilationResult: compileResults })
     if(fileName && compileResults.line) {
       this.highlightErrors(fileName, compileResults.line, '#e0b4b4')
@@ -127,8 +129,9 @@ class App extends Component {
   }
 
   onCompileSucceeded(compileResults) {
+    remixExtension.emit('statusChanged', { key: 'success', type: 'success', title: 'succeed' })
     this.setState({ compilationResult: compileResults })
-    remixExtension.call('sourceHighlighters', 'discardHighlight')
+    remixExtension.call('editor', 'discardHighlight')
     var abi = compileResults['abi']
     var bytecode = compileResults['bytecode'].replace('0x','')
     var deployedBytecode = compileResults['bytecode_runtime'].replace('0x','')
@@ -162,7 +165,7 @@ class App extends Component {
         "methodIdentifiers": methodIdentifiers
       }
     }
-    remixExtension.emit('compilationFinished', [this.state.placeholderText, this.state.vyper, 'vyper', data])
+    remixExtension.emit('compilationFinished', this.state.placeholderText, this.state.vyper, 'vyper', data)
   }
 
   createCompilationResultMessage(fileName, result) {
@@ -253,7 +256,6 @@ class App extends Component {
           <Header as='h1'>
             <Image src="./logo.svg" />
             <Header.Content>
-              Vyper Plugin
               <Popup trigger={<Icon size='tiny' name="question circle" />}>
                 <div>1. Write vyper code(.vy) in the editor</div>
                 <div>2. Click Compile button</div>
@@ -263,6 +265,7 @@ class App extends Component {
             <a href="https://github.com/LayerXcom/vyper-remix" target="_blank" align="right" style={{"color": "inherit"}}>
                 <i class="github icon"></i>
             </a>
+            <Button icon primary content='Load Ballot.vy' icon='sync' primary onClick={() => this.loadBallot()} />
           </Header>
 
         </div>
