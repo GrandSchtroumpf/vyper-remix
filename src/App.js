@@ -5,7 +5,7 @@ import { CopyToClipboard } from 'react-copy-to-clipboard'
 import { ballot } from './example-contracts'
 
 import { createIframeClient } from 'remix-plugin'
-const devMode = { port: 8000 }
+const devMode = { port: 8080 }
 const remixExtension = createIframeClient({ devMode })
 
 class App extends Component {
@@ -43,17 +43,16 @@ class App extends Component {
   }
 
   async onPluginLoaded() {
-    await remixExtension.loaded() // Wait for remixExtension to get the handshake
   }
 
   async loadBallot () {
-    await remixExtension.call('fileManager', 'setFile', 'browser/ballot.vy', ballot)
+    await remixExtension.call('fileManager', 'setFile', 'browser/ballot.vy', ballot.content)
   }
 
   async onCompileFromRemix() {
     this.setState({ compilationResult: {status: "inProgress" }})
     const plugin = this
-     plugin.result = {}
+    plugin.result = {}
     remixExtension.emit('statusChanged', { key: 'spinner', type: 'info', title: 'compiling...' })
     const title = await remixExtension.call('fileManager', 'getCurrentFile')
     console.log(title)
@@ -64,11 +63,11 @@ class App extends Component {
     console.log(file)
 
 
-    plugin.result.vyper = file
-    plugin.compile(plugin.onCompileSucceeded, plugin.onCompileFailed, plugin.result)
+    this.state.vyper = file
+    plugin.compile(plugin.onCompileSucceeded, plugin.onCompileFailed)
   }
 
-  compile(onCompileSucceeded, onCompileFailed, result) {
+  compile(onCompileSucceeded, onCompileFailed) {
     if (!this.state.placeholderText) {
       onCompileFailed({status: 'failed', message: "Set your Vyper contract file."})
       return
@@ -112,7 +111,7 @@ class App extends Component {
     request.addEventListener("error", () => {
       onCompileFailed({status: 'failed', message: `Error. Wrong code or network error at "${compileURL}".`})
     })
-    request.send(JSON.stringify({ "code": result.vyper }))
+    request.send(JSON.stringify({ "code": this.state.vyper }))
   }
 
   highlightErrors(fileName, line, color) {
