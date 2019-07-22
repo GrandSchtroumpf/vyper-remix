@@ -70,7 +70,7 @@ function CompilerButton({ contract, setOutput, compilerUrl }: Props) {
 
   return (
     <Button onClick={compileContract} variant="primary">
-      Compiler {name}
+      Compile {name}
     </Button>
   )
 }
