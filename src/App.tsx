@@ -7,6 +7,7 @@ import { CompilationResult } from '@remixproject/plugin'
 
 // Components
 import CompilerButton from './components/CompilerButton'
+import WarnRemote from './components/WarnRemote'
 import VyperResult from './components/VyperResult'
 import LocalUrlInput from './components/LocalUrl'
 import ToggleButtonGroup from 'react-bootstrap/ToggleButtonGroup'
@@ -31,7 +32,7 @@ const App: React.FC = () => {
   const [output, setOutput] = useState<OutputMap>({})
   const [state, setState] = useState<AppState>({
     status: 'idle',
-    environment: 'remote',
+    environment: 'local',
     localUrl: 'http://localhost:8000/compile'
   })
 
@@ -98,6 +99,7 @@ const App: React.FC = () => {
           setUrl={setLocalUrl}
           environment={state.environment}
         />
+        <WarnRemote environment={state.environment} />
         <div id="compile-btn">
           <CompilerButton
             compilerUrl={compilerUrl()}
